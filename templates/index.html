@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Hệ thống đếm người thông minh sử dụng AI để theo dõi và đếm số lượng người vào/ra trong video thời gian thực" />
+    <meta name="keywords" content="people counter, AI tracking, video analysis, real-time counting" />
+    <title>Hệ thống đếm người - People Counter System</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app">
+        <header class="app-header">
+            <div>
+                <h1>Hệ thống đếm người</h1>
+                <p class="subtitle">Tải video lên, theo dõi luồng trực tiếp và số lượt vào/ra theo thời gian thực.</p>
+            </div>
+            <div class="status-pill" id="globalStatusPill">Đang chờ video</div>
+        </header>
+
+        <main class="layout">
+            <section class="card card-upload">
+                <h2>Tải video lên</h2>
+                <p class="card-desc">Chọn một file video từ máy của bạn để hệ thống xử lý.</p>
+
+                <form id="uploadForm" class="upload-form">
+                    <label class="file-input-label">
+                        <span id="fileLabelText">Chọn file video</span>
+                        <input type="file" name="video" id="videoInput" accept="video/*" required hidden>
+                    </label>
+                    
+                    <div class="line-config">
+                        <div class="config-row config-line-type">
+                            <span class="config-label">Kiểu đường đếm:</span>
+                            <div class="line-type-options">
+                                <label class="line-type-option">
+                                    <input type="radio" name="lineType" value="horizontal" checked>
+                                    <span>Đường ngang</span>
+                                    <small>Trên ↔ Dưới (vào/ra)</small>
+                                </label>
+                                <label class="line-type-option">
+                                    <input type="radio" name="lineType" value="vertical">
+                                    <span>Đường dọc giữa</span>
+                                    <small>Trái → Phải = Vào, Phải → Trái = Ra</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="config-row config-toggle">
+                            <label class="toggle-label">
+                                <input type="checkbox" id="autoDetectToggle" checked>
+                                <span class="toggle-text">Tự động phát hiện đường đếm</span>
+                            </label>
+                            <span class="toggle-hint">Với đường ngang: tự động tìm vị trí. Với đường dọc: dùng giữa khung hình.</span>
+                        </div>
+                        
+                        <div id="manualConfig" style="display: none;">
+                            <h3>Cấu hình đường đếm thủ công</h3>
+                            
+                            <div id="verticalConfig" style="display: none;">
+                                <div class="config-row">
+                                    <label for="lineX">Vị trí đường dọc (X):</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="lineX" min="50" max="1000" value="320" step="10">
+                                        <span id="lineXValue">320</span>
+                                    </div>
+                                    <p class="config-hint">Đường dọc từ trên xuống. Trái → Phải = Vào, Phải → Trái = Ra.</p>
+                                </div>
+                            </div>
+                            
+                            <div id="horizontalConfig">
+                                <div class="config-row">
+                                    <label for="lineY">Vị trí đường đếm (Y):</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="lineY" min="50" max="1000" value="300" step="10">
+                                        <span id="lineYValue">300</span>
+                                    </div>
+                                </div>
+                                <div class="config-row">
+                                    <label for="lineAngle">Góc nghiêng (độ):</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="lineAngle" min="-45" max="45" value="0" step="5">
+                                        <span id="lineAngleValue">0°</span>
+                                    </div>
+                                </div>
+                                <div class="config-row">
+                                    <label for="lineX1">Điểm bắt đầu X:</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="lineX1" min="0" max="1000" value="0" step="10">
+                                        <span id="lineX1Value">0</span>
+                                    </div>
+                                </div>
+                                <div class="config-row">
+                                    <label for="lineX2">Điểm kết thúc X:</label>
+                                    <div class="slider-container">
+                                        <input type="range" id="lineX2" min="0" max="1000" value="640" step="10">
+                                        <span id="lineX2Value">640</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="button" id="resetLineBtn" class="btn-secondary">Đặt lại mặc định</button>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" id="uploadBtn">Bắt đầu xử lý</button>
+                </form>
+
+                <p class="upload-hint">Lưu ý: Quá trình xử lý có thể mất một chút thời gian tùy độ dài video. Bạn có thể điều chỉnh đường đếm trước khi upload.</p>
+                <p class="upload-message" id="uploadMessage"></p>
+            </section>
+
+            <section class="card card-stream">
+                <div class="card-header-inline">
+                    <h2>Luồng trực tiếp</h2>
+                    <span class="badge">Realtime</span>
+                </div>
+                <div class="stream-wrapper">
+                    <img src="" alt="Luồng video đang xử lý" id="videoStream">
+                </div>
+            </section>
+
+            <section class="card card-dashboard">
+                <h2>Dashboard</h2>
+                <div class="metrics">
+                    <div class="metric metric-in">
+                        <span class="metric-label">IN</span>
+                        <span class="metric-value" id="in">0</span>
+                    </div>
+                    <div class="metric metric-out">
+                        <span class="metric-label">OUT</span>
+                        <span class="metric-value" id="out">0</span>
+                    </div>
+                    <div class="metric metric-net">
+                        <span class="metric-label">NET</span>
+                        <span class="metric-value" id="net">0</span>
+                    </div>
+                </div>
+
+                <div class="status-row">
+                    <span class="status-label">Trạng thái:</span>
+                    <span class="status-value" id="status">Đang chờ</span>
+                </div>
+
+                <div class="chart-section">
+                    <h3>Biểu đồ theo thời gian</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="realtimeChart"></canvas>
+                    </div>
+                    <div class="chart-actions">
+                        <a href="#" id="exportCsvBtn" class="btn-csv">Tải CSV</a>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+    const REALTIME_BASE_URL = "{{ realtime_base_url }}";
+    // DOM Elements
+    const uploadForm = document.getElementById("uploadForm");
+    const videoInput = document.getElementById("videoInput");
+    const fileLabelText = document.getElementById("fileLabelText");
+    const uploadBtn = document.getElementById("uploadBtn");
+    const uploadMessage = document.getElementById("uploadMessage");
+    const globalStatusPill = document.getElementById("globalStatusPill");
+    const videoStream = document.getElementById("videoStream");
+    // set stream source from realtime server
+    videoStream.src = `${REALTIME_BASE_URL}/video_feed`;
+    
+    // Line configuration elements
+    const autoDetectToggle = document.getElementById("autoDetectToggle");
+    const manualConfig = document.getElementById("manualConfig");
+    const horizontalConfig = document.getElementById("horizontalConfig");
+    const verticalConfig = document.getElementById("verticalConfig");
+    const lineTypeRadios = document.querySelectorAll('input[name="lineType"]');
+    const lineYSlider = document.getElementById("lineY");
+    const lineYValue = document.getElementById("lineYValue");
+    const lineAngleSlider = document.getElementById("lineAngle");
+    const lineAngleValue = document.getElementById("lineAngleValue");
+    const lineX1Slider = document.getElementById("lineX1");
+    const lineX1Value = document.getElementById("lineX1Value");
+    const lineX2Slider = document.getElementById("lineX2");
+    const lineX2Value = document.getElementById("lineX2Value");
+    const lineXSlider = document.getElementById("lineX");
+    const lineXValue = document.getElementById("lineXValue");
+    const resetLineBtn = document.getElementById("resetLineBtn");
+
+    // State
+    let previousValues = { in: 0, out: 0, net: 0 };
+    let isProcessing = false;
+    let videoDimensions = { width: 640, height: 480 }; // Default dimensions
+
+    // Format file size
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    function getLineType() {
+        const r = document.querySelector('input[name="lineType"]:checked');
+        return r ? r.value : "horizontal";
+    }
+
+    // Toggle manual config: show vertical or horizontal panel
+    function syncManualConfigPanels() {
+        const isVertical = getLineType() === "vertical";
+        if (horizontalConfig) horizontalConfig.style.display = isVertical ? "none" : "block";
+        if (verticalConfig) verticalConfig.style.display = isVertical ? "block" : "none";
+    }
+
+    // Toggle auto-detect mode
+    autoDetectToggle.addEventListener("change", () => {
+        if (autoDetectToggle.checked) {
+            manualConfig.style.display = "none";
+        } else {
+            manualConfig.style.display = "block";
+            syncManualConfigPanels();
+        }
+    });
+
+    lineTypeRadios.forEach(r => r.addEventListener("change", () => {
+        syncManualConfigPanels();
+        if (videoDimensions.width && lineXSlider) {
+            lineXSlider.max = videoDimensions.width;
+            lineXSlider.value = Math.floor(videoDimensions.width / 2);
+            if (lineXValue) lineXValue.textContent = lineXSlider.value;
+        }
+    }));
+    
+    // Update slider values display
+    function updateSliderValues() {
+        lineYValue.textContent = lineYSlider.value;
+        lineAngleValue.textContent = lineAngleSlider.value + "°";
+        lineX1Value.textContent = lineX1Slider.value;
+        lineX2Value.textContent = lineX2Slider.value;
+        if (lineXValue) lineXValue.textContent = lineXSlider.value;
+    }
+    
+    lineYSlider.addEventListener("input", updateSliderValues);
+    lineAngleSlider.addEventListener("input", updateSliderValues);
+    lineX1Slider.addEventListener("input", updateSliderValues);
+    lineX2Slider.addEventListener("input", updateSliderValues);
+    if (lineXSlider) lineXSlider.addEventListener("input", updateSliderValues);
+    
+    // Reset line configuration
+    resetLineBtn.addEventListener("click", () => {
+        const isVertical = getLineType() === "vertical";
+        if (isVertical) {
+            lineXSlider.value = Math.floor((videoDimensions.width || 640) / 2);
+            lineXValue.textContent = lineXSlider.value;
+        } else {
+            lineYSlider.value = 300;
+            lineAngleSlider.value = 0;
+            lineX1Slider.value = 0;
+            lineX2Slider.value = videoDimensions.width || 640;
+            updateSliderValues();
+        }
+    });
+    
+    // File input change handler
+    videoInput.addEventListener("change", () => {
+        if (videoInput.files && videoInput.files[0]) {
+            const file = videoInput.files[0];
+            const fileSize = formatFileSize(file.size);
+            fileLabelText.textContent = `${file.name} (${fileSize})`;
+            uploadMessage.textContent = "";
+            uploadMessage.className = "upload-message";
+            
+            // Validate file type
+            if (!file.type.startsWith('video/')) {
+                uploadMessage.textContent = "Vui lòng chọn một file video hợp lệ.";
+                uploadMessage.className = "upload-message error";
+            } else {
+                // Try to get video dimensions to set default line position
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+                video.onloadedmetadata = () => {
+                    videoDimensions.width = video.videoWidth;
+                    videoDimensions.height = video.videoHeight;
+                    lineYSlider.max = videoDimensions.height - 50;
+                    lineX1Slider.max = videoDimensions.width;
+                    lineX2Slider.max = videoDimensions.width;
+                    lineYSlider.value = Math.floor(videoDimensions.height / 2);
+                    lineX2Slider.value = videoDimensions.width;
+                    if (lineXSlider) {
+                        lineXSlider.max = videoDimensions.width;
+                        lineXSlider.value = Math.floor(videoDimensions.width / 2);
+                    }
+                    updateSliderValues();
+                };
+                video.src = URL.createObjectURL(file);
+            }
+        } else {
+            fileLabelText.textContent = "Chọn file video";
+        }
+    });
+
+    // Upload form handler
+    uploadForm.onsubmit = async e => {
+        e.preventDefault();
+        
+        if (!videoInput.files || !videoInput.files[0]) {
+            uploadMessage.textContent = "Vui lòng chọn một file video.";
+            uploadMessage.className = "upload-message error";
+            return;
+        }
+
+        if (isProcessing) {
+            uploadMessage.textContent = "Đang xử lý video khác. Vui lòng đợi...";
+            uploadMessage.className = "upload-message error";
+            return;
+        }
+
+        const form = new FormData(uploadForm);
+        form.append("auto_detect", autoDetectToggle.checked ? "true" : "false");
+        form.append("line_type", getLineType());
+        
+        if (!autoDetectToggle.checked) {
+            if (getLineType() === "vertical") {
+                form.append("line_x", lineXSlider.value);
+            } else {
+                form.append("line_y", lineYSlider.value);
+                form.append("line_angle", lineAngleSlider.value);
+                form.append("line_x1", lineX1Slider.value);
+                form.append("line_x2", lineX2Slider.value);
+            }
+        }
+        
+        isProcessing = true;
+
+        // Update UI for upload
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<span class="loading"></span>Đang tải lên...';
+        uploadMessage.textContent = "Đang tải lên và bắt đầu xử lý video...";
+        uploadMessage.className = "upload-message info";
+        globalStatusPill.textContent = "Đang tải lên...";
+        globalStatusPill.className = "status-pill uploading";
+
+        try {
+            const res = await fetch("/upload", { method: "POST", body: form });
+
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || "Không thể tải video lên.");
+            }
+
+            uploadMessage.textContent = "Hệ thống đã nhận video. Đang xử lý...";
+            uploadMessage.className = "upload-message success";
+            globalStatusPill.textContent = "Đang xử lý...";
+            globalStatusPill.className = "status-pill processing";
+            
+            // Reset form
+            uploadForm.reset();
+            fileLabelText.textContent = "Chọn file video";
+        } catch (err) {
+            uploadMessage.textContent = err.message;
+            uploadMessage.className = "upload-message error";
+            globalStatusPill.textContent = "Lỗi";
+            globalStatusPill.className = "status-pill error";
+            isProcessing = false;
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = "Bắt đầu xử lý";
+        }
+    };
+
+    // Animate number update
+    function animateValueUpdate(element, newValue, oldValue) {
+        if (newValue !== oldValue) {
+            element.classList.add('updated');
+            setTimeout(() => {
+                element.classList.remove('updated');
+            }, 500);
+        }
+    }
+
+    // Refresh dashboard data
+    async function refreshDashboard() {
+        try {
+            const r = await fetch(`${REALTIME_BASE_URL}/api/result`);
+            if (!r.ok) return;
+            const d = await r.json();
+
+            // Update values with animation
+            const inElement = document.getElementById("in");
+            const outElement = document.getElementById("out");
+            const netElement = document.getElementById("net");
+
+            if (inElement.innerText !== String(d.in)) {
+                animateValueUpdate(inElement, d.in, previousValues.in);
+                inElement.innerText = d.in;
+            }
+            
+            if (outElement.innerText !== String(d.out)) {
+                animateValueUpdate(outElement, d.out, previousValues.out);
+                outElement.innerText = d.out;
+            }
+            
+            if (netElement.innerText !== String(d.net)) {
+                animateValueUpdate(netElement, d.net, previousValues.net);
+                netElement.innerText = d.net;
+            }
+
+            // Update previous values
+            previousValues = { in: d.in, out: d.out, net: d.net };
+
+            // Update status
+            const running = !!d.running;
+            const statusElement = document.getElementById("status");
+            const statusText = running ? "Đang xử lý" : "Hoàn thành";
+            
+            if (statusElement.innerText !== statusText) {
+                statusElement.innerText = statusText;
+            }
+
+            // Update global status pill
+            if (running) {
+                globalStatusPill.textContent = "Đang xử lý...";
+                globalStatusPill.className = "status-pill processing";
+                isProcessing = true;
+            } else if (isProcessing) {
+                globalStatusPill.textContent = "Hoàn thành";
+                globalStatusPill.className = "status-pill success";
+                isProcessing = false;
+            }
+
+            // Handle video stream error
+            videoStream.onerror = () => {
+                if (running) {
+                    videoStream.alt = "Đang tải video stream...";
+                }
+            };
+
+            videoStream.onload = () => {
+                videoStream.alt = "Luồng video đang xử lý";
+            };
+
+        } catch (e) {
+            console.error("Error refreshing dashboard:", e);
+        }
+    }
+
+    // Biểu đồ realtime (Chart.js)
+    const chartCtx = document.getElementById("realtimeChart").getContext("2d");
+    const realtimeChart = new Chart(chartCtx, {
+        type: "line",
+        data: {
+            labels: [],
+            datasets: [
+                { label: "IN", data: [], borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.1)", fill: true, tension: 0.2 },
+                { label: "OUT", data: [], borderColor: "#ef4444", backgroundColor: "rgba(239,68,68,0.1)", fill: true, tension: 0.2 },
+                { label: "NET", data: [], borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.1)", fill: true, tension: 0.2 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: "top" } },
+            scales: {
+                x: { title: { display: true, text: "Thời gian" }, ticks: { maxTicksLimit: 10 } },
+                y: { beginAtZero: true, title: { display: true, text: "Số lượng" } }
+            }
+        }
+    });
+
+    function formatTime(epoch) {
+        const d = new Date(epoch * 1000);
+        return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    async function refreshChart() {
+        try {
+            const r = await fetch(`${REALTIME_BASE_URL}/api/history`);
+            if (!r.ok) return;
+            const history = await r.json();
+            if (!history.length) return;
+            const labels = history.map((row) => formatTime(row.t));
+            realtimeChart.data.labels = labels;
+            realtimeChart.data.datasets[0].data = history.map((row) => row.in);
+            realtimeChart.data.datasets[1].data = history.map((row) => row.out);
+            realtimeChart.data.datasets[2].data = history.map((row) => row.net);
+            realtimeChart.update("none");
+        } catch (e) { console.error("Chart refresh:", e); }
+    }
+
+    document.getElementById("exportCsvBtn").addEventListener("click", async (e) => {
+        e.preventDefault();
+        try {
+            const r = await fetch(`${REALTIME_BASE_URL}/api/export/csv`);
+            if (!r.ok) throw new Error("Không có dữ liệu");
+            const blob = await r.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `counting_${new Date().toISOString().slice(0,19).replace(/[-:T]/g, "").replace("T","_")}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            alert(err.message || "Xuất CSV thất bại.");
+        }
+    });
+
+    // Initialize dashboard
+    refreshDashboard();
+    refreshChart();
+
+    // Poll for updates - single interval with visibility handling
+    let pollInterval = setInterval(refreshDashboard, 700);
+    let chartInterval = setInterval(refreshChart, 1000);
+    
+    // Handle page visibility to reduce polling when tab is hidden
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            clearInterval(pollInterval);
+            clearInterval(chartInterval);
+            pollInterval = chartInterval = null;
+        } else {
+            if (!pollInterval) pollInterval = setInterval(refreshDashboard, 700);
+            if (!chartInterval) chartInterval = setInterval(refreshChart, 1000);
+            refreshDashboard();
+            refreshChart();
+        }
+    });
+    </script>
+</body>
+</html>

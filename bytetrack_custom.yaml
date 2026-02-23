@@ -1,0 +1,31 @@
+# ByteTracker Configuration for Stable ID Tracking
+# Tối ưu để giảm ID switch khi bị che khuất hoặc đông người
+
+# First-stage match threshold for track association
+# Tăng lên để chỉ track những detection chắc chắn hơn, giảm ID switch
+track_high_thresh: 0.5  # Mặc định: 0.25, tăng lên để giữ ID tốt hơn
+
+# Second-stage threshold for low-score matches  
+# Giảm để cân bằng giữa recover lost tracks và minimize drift
+track_low_thresh: 0.1  # Mặc định: 0.1, giữ nguyên
+
+# Number of frames to keep lost tracks alive
+# Tăng lên để giữ track lâu hơn khi bị che khuất tạm thời
+# Quan trọng để giảm ID switch khi bị occlusion
+track_buffer: 50  # Mặc định: 30, tăng lên để giữ ID tốt hơn khi bị che
+
+# Threshold for initiating a new track when no match is found
+# Tăng lên để giảm track giả và ID switch không cần thiết
+new_track_thresh: 0.4  # Mặc định: 0.25, tăng lên để giảm track giả
+
+# Association similarity threshold (IoU/cost metric)
+# Giữ ở mức hợp lý để matching tốt
+match_thresh: 0.8  # Mặc định: 0.8, giữ nguyên
+
+# Fuses detection score with motion/IoU for matching
+# Giúp stabilize matching với weak detections
+fuse_score: True  # Mặc định: True, giữ nguyên
+
+# Frame rate (for temporal consistency)
+# Có thể điều chỉnh theo FPS của video
+fps: 30  # Mặc định: 30
